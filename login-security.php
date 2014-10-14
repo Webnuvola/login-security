@@ -3,11 +3,9 @@
 Plugin Name: Login Security
 Plugin URI: http://tonyarchambeau.com/
 Description: Improves the security of the login page against brute-force attacks. Records every attempts to login. Easily block an IP address.
-Version: 1.0.2
+Version: 1.0.3
 Author: Tony Archambeau
 Author URI: http://tonyarchambeau.com/
-Text Domain: wp-login-security
-Domain Path: /languages
 
 */
 
@@ -78,7 +76,7 @@ if ( function_exists('register_activation_hook') ) {
  */
 function ls_install() {
   global $wpdb;
-  
+
   // Define the CHARSET for the table
   $charset_collate = '';
   if ( !empty($wpdb->charset) ) {
@@ -87,7 +85,7 @@ function ls_install() {
   if ( !empty($wpdb->collate) ) {
     $charset_collate .= " COLLATE ".$wpdb->collate;
   }
-  
+
   $sql = "CREATE TABLE `".LS_DB_TABLE_LOGIN_ACCESS."` (
  `wla_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
  `wla_date` datetime DEFAULT NULL,
@@ -113,14 +111,14 @@ function ls_install() {
   UNIQUE KEY `wlab_block_ip` (`wlab_blocked_ip`),
   KEY `wlab_is_blocked` (`wlab_is_blocked`)
 ) $charset_collate;";
-  
+
   // Install or update
   require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
   dbDelta($sql);
-  
+
   // Get the current DB version
   $installed_db_version = get_option( 'ls_db_version' );
-  
+
   if ( empty($installed_db_version) ) {
     // Add DB version on DB WordPress
     add_option( 'ls_db_version', LS_DB_VERSION );
@@ -135,9 +133,9 @@ function ls_install() {
  * Uninstall this plugin
  */
 function ls_uninstall() {
-  
+
   // @TODO uninstall only if user decided to ! ()
-  
+
 }
 
 
@@ -145,10 +143,10 @@ function ls_uninstall() {
  * Check if an UPDATE is necessary
  */
 function ls_update_check() {
-  
+
   // get the current DB version
   $db_version = get_site_option( 'ls_db_version' );
-  
+
   // Update the DB structure if the DB version changed
   if ( !empty($db_version) && $db_version != LS_DB_VERSION ) {
     ls_install();
@@ -167,7 +165,7 @@ add_action( 'plugins_loaded', 'ls_update_check' );
  * Add menu on the Back-Office for the plugin
  */
 function ls_add_options_page() {
-  
+
   if ( function_exists('add_options_page') ) {
     $page_title = __('Login Security', 'login_security');
     $menu_title = __('Login Security', 'login_security');
@@ -176,19 +174,19 @@ function ls_add_options_page() {
     $function = 'ls_add_settings_page'; // function that contain the page
     add_options_page( $page_title, $menu_title, $capability, $menu_slug, $function );
   }
-  
+
 }
 add_action('admin_menu', 'ls_add_options_page');
 
 
 /**
  * Add the settings page
- * 
+ *
  * @return boolean
  */
 function ls_add_settings_page() {
   $path = trailingslashit(dirname(__FILE__));
-  
+
   if ( !file_exists( $path . 'settings.php') ) {
     return false;
   }
@@ -215,18 +213,18 @@ add_filter('plugin_row_meta', 'ls_plugin_row_meta',10,2);
 
 /**
  * Display pagination links for Back-Office
- * 
+ *
  * @param int $current_page
  * @param int $items_per_page
  * @return Ambigous <multitype:, string, void, multitype:string >
  */
 function ls_bo_paginate_links( $current_page = 1, $items_per_page = 30 ) {
   global $wpdb;
-  
+
   // Get the total number of rows in a query
   $count_rows = $wpdb->get_row('SELECT FOUND_ROWS() AS count_rows');
   $total_rows = $count_rows->count_rows;
-  
+
   // Define the base URL
   $base_url = '';
   foreach($_GET as $k => $v) {
@@ -235,10 +233,10 @@ function ls_bo_paginate_links( $current_page = 1, $items_per_page = 30 ) {
       $base_url .= $k . '=' . $v;
     }
   }
-  
+
   // Get siteurl
   $siteurl = get_option('siteurl');
-  
+
   // Args to get the pagination links
   $args = array(
       'base'         => $siteurl.'/wp-admin/admin.php' . $base_url . '%_%',
@@ -248,7 +246,7 @@ function ls_bo_paginate_links( $current_page = 1, $items_per_page = 30 ) {
       'prev_text'    => __('Previous', 'login_security'),
       'next_text'    => __('Next', 'login_security'),
   );
-  
+
   // return pagination links
   return paginate_links( $args ).' '.sprintf(__('(%1$s results)', 'login_security'), $total_rows);
 }
@@ -256,7 +254,7 @@ function ls_bo_paginate_links( $current_page = 1, $items_per_page = 30 ) {
 
 /**
  * Display the header of the table
- * 
+ *
  * @param array $columns
  */
 function ls_bo_table_thead( array $columns = array() ) {
@@ -274,7 +272,7 @@ function ls_bo_table_thead( array $columns = array() ) {
 
 /**
  * Display the table element for the pagination
- * 
+ *
  * @param int $columns_count
  * @param str $paginate_links
  */
@@ -295,29 +293,29 @@ function ls_bo_pagination_table($columns_count, $paginate_links) {
  * Check if a visitor with a blocked IP address tries to access the website
  */
 function ls_is_ip_allowed() {
-  
+
   // Get the current IP
   $current_ip = ls_get_ip();
-  
+
   // Query to know if the current IP is on the list of blocked
   $blocked_info = ls_db_get_block_by_ip( $current_ip );
-  
+
   // If the current IP is blocked : EXIT
   if ($blocked_info == null) {
     return '';
   }
-  
+
   global $wpdb;
-  
+
   // increment visits
   $data = array( 'wlab_blocked_visits' => ($blocked_info['wlab_blocked_visits'] + 1) );
   $where = array();
   $where['wlab_blocked_ip'] = $current_ip;
   $where['wlab_is_blocked'] = 1;
-  
+
   // Query to update in DB
   $wpdb->update( LS_DB_TABLE_LOGIN_ACCESS_BLACKLIST, $data, $where );
-  
+
   // Block and display a message
   $message = __('Oups, your IP address was blocked for security reason. Please contact the administrator if you want that your IP to be unlocked.', 'login_security');
   exit( $message );
@@ -335,7 +333,7 @@ add_action('plugins_loaded', 'ls_is_ip_allowed');
 
 /**
  * Get the current tab
- * 
+ *
  * @return Ambigous <string, mixed>|string
  */
 function ls_get_current_tab() {
@@ -352,17 +350,17 @@ function ls_get_current_tab() {
  */
 function ls_show_tabs() {
   global $wp_db_version;
-  
+
   // Get the current tab
   $current_tab = ls_get_current_tab();
-  
+
   // All tabs
   $tabs = array();
   $tabs['main']          = __('Main', 'login_security');
   $tabs['login_fail']    = __('Failed login', 'login_security');
   $tabs['login_fail_ip'] = __('Failed login by IP', 'login_security');
   $tabs['login_success'] = __('Successfull login', 'login_security');
-  
+
   // Generate the tab links
   $tab_links = array();
   foreach ($tabs as $tab_k => $tab_name) {
@@ -370,7 +368,7 @@ function ls_show_tabs() {
     $tab_url = '?page=' . plugin_basename(__FILE__) .'&amp;tab='.$tab_k;
     $tab_links[] = '<a class="nav-tab'.$tab_curent.'" href="'.$tab_url.'">'.$tab_name.'</a>';
   }
-  
+
   // Since the 25 oct. 2010 WordPress include the tabs (in CSS)
   // The 25 oct. 2010 = WordPress version was "3.1-alpha"
   if ( $wp_db_version >= 15477 ) {
@@ -388,7 +386,7 @@ function ls_show_tabs() {
     </div>
     <?php
   }
-  
+
   return;
 }
 
@@ -403,10 +401,10 @@ function ls_show_tabs() {
  * Get the real IP address of the user
  */
 function ls_get_ip() {
-  
+
   // init
   $ip_address = '';
-  
+
   // IP if internet is shared
   if (isset($_SERVER['HTTP_CLIENT_IP']) && !empty($_SERVER['HTTP_CLIENT_IP'])) {
     $ip_address = $_SERVER['HTTP_CLIENT_IP'];
@@ -423,13 +421,13 @@ function ls_get_ip() {
   else {
     $ip_address = '';
   }
-  
+
   // Check if there are multiple IP adresse
   if (strpos($ip_address, ',') !== false) {
     $ip_address = explode(',', $ip_address);
     $ip_address = current($ip_address);
   }
-  
+
   // Return the real IP
   return esc_attr($ip_address);
 }
@@ -453,26 +451,26 @@ function ls_get_referer() {
 
 /**
  * Return the datetime
- * 
+ *
  * @param str $datetime
  */
 function ls_format_datetime( $datetime ) {
-  
+
   // Verify if there is an empty string
   if ( empty($datetime) ) {
 	return '';
   }
-  
+
   // Get the date_format and time_format
   $date_format = get_option( 'date_format' );
   $time_format = get_option( 'time_format' );
   $date_timestamp = strtotime( $datetime );
-  
+
   // Failed with the strtotime() function
   if ( $date_timestamp==false || $date_timestamp==-1 ) {
     return '';
   }
-  
+
   // Display the date with the date_format and time_format
   return sprintf(
 	__('%1$s at %2$s', 'login_security'),
@@ -484,17 +482,17 @@ function ls_format_datetime( $datetime ) {
 
 /**
  * Get an array of the last X days
- * 
+ *
  * @param int $days_count
  */
 function ls_get_last_days( $days_count = 7 ) {
-  
+
   // init
   $dates_array = array();
   $current_year  = date_i18n('Y');
   $current_month = date_i18n('m');
   $current_day   = date_i18n('d');
-  
+
   // list previous X days
   for ( $i=1 ; $i<=$days_count ; $i++ ) {
     $dates_array[] = date('Y-m-d', mktime(0, 0, 0, $current_month, ($current_day-$i), $current_year));
@@ -507,14 +505,14 @@ function ls_get_last_days( $days_count = 7 ) {
 
 /**
  * Get an array of the last X months
- * 
+ *
  * @param int $months_count
  */
 function ls_get_last_months( $months_count = 12 ) {
-  
+
   // init
   $dates_array = array();
-  
+
   // list previous X days
   for ($i = 0 ; $i < $months_count ; $i++) {
     $dates_array[] = date('Y-m', strtotime( date_i18n( 'Y-m-01' ).' -'.$i.' months'));
@@ -527,14 +525,14 @@ function ls_get_last_months( $months_count = 12 ) {
 
 /**
  * Get a user through an ID
- * 
+ *
  * @param int $wp_user_id
  */
 function ls_format_user( $wp_user_id=null ) {
-  
+
   // query to get the user by it's ID
   $user = get_user_by( 'id', $wp_user_id );
-  
+
   if ( $user != false ) {
 	// return the user info
 	return sprintf(
@@ -562,9 +560,9 @@ function ls_format_user( $wp_user_id=null ) {
  * @param object $user
  */
 function ls_login_succeed( $user_login, $user ) {
-  
+
   global $wpdb;
-  
+
   // Data log
   $dataLog = array();
   $dataLog['wla_date']              = date_i18n('Y-m-d H:i:s');
@@ -573,10 +571,10 @@ function ls_login_succeed( $user_login, $user ) {
   $dataLog['wla_user_agent']        = ls_get_user_agent();
   $dataLog['wla_referer']           = ls_get_referer();
   $dataLog['wla_logged_wp_user_id'] = isset($user->ID) ? $user->ID : 0;
-  
+
   // Query to insert in DB
   $wpdb->insert( LS_DB_TABLE_LOGIN_ACCESS, $dataLog );
-  
+
 }
 add_action( 'wp_login', 'ls_login_succeed', 10, 2 );
 
@@ -587,29 +585,32 @@ add_action( 'wp_login', 'ls_login_succeed', 10, 2 );
  * @param str $username
  */
 function ls_login_failed( $username ) {
-  
-  global $wpdb;
-  
-  // Data log
-  $dataLog = array();
-  $dataLog['wla_date']         = date_i18n('Y-m-d H:i:s');
-  $dataLog['wla_ip']           = ls_get_ip();
-  $dataLog['wla_is_failed']    = 1;
-  $dataLog['wla_user_agent']   = ls_get_user_agent();
-  $dataLog['wla_referer']      = ls_get_referer();
-  $dataLog['wla_failed_login'] = $username;
-  
-  // try to get the user if it exists
-  $user = get_user_by( 'login', $username );
-  if ( $user != false ) {
-    // if there is auser with this login, save user password (md5)
-    // this can help in a futur to know if the user password should be modified
-    $dataLog['wla_failed_pass_md5'] = (isset($user->user_pass) ? $user->user_pass : '');
-  }
-  
-  // Query to insert in DB
-  $wpdb->insert( LS_DB_TABLE_LOGIN_ACCESS, $dataLog );
-  
+
+    global $wpdb;
+
+    // Data log
+    $dataLog = array();
+    $dataLog['wla_date']         = date_i18n('Y-m-d H:i:s');
+    $dataLog['wla_ip']           = ls_get_ip();
+    $dataLog['wla_is_failed']    = 1;
+    $dataLog['wla_user_agent']   = ls_get_user_agent();
+    $dataLog['wla_referer']      = ls_get_referer();
+    $dataLog['wla_failed_login'] = $username;
+
+    // try to get the user if it exists
+    $user = get_user_by( 'login', $username );
+    if ( $user != false ) {
+        // if there is auser with this login, save user password (md5)
+        // this can help in a futur to know if the user password should be modified
+        $dataLog['wla_failed_pass_md5'] = (isset($user->user_pass) ? $user->user_pass : '');
+    }
+
+    // Query to insert in DB
+    $wpdb->insert( LS_DB_TABLE_LOGIN_ACCESS, $dataLog );
+
+    if(ls_db_get_num_fail_by_ip_in_5_mins($dataLog['wla_ip'])>=5){
+        ls_db_insert_ip_to_blacklist($dataLog['wla_ip']);
+    }
+
 }
 add_action( 'wp_login_failed', 'ls_login_failed' );
-
