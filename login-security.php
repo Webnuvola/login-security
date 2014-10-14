@@ -321,8 +321,8 @@ function ls_is_ip_allowed() {
   exit( $message );
   return;
 }
-// very early hook in wordpress, to check if the IP address is allowed
-add_action('plugins_loaded', 'ls_is_ip_allowed');
+// first hook in wordpress, to check if the IP address is allowed
+add_action('muplugins_loaded', 'ls_is_ip_allowed');
 
 
 
